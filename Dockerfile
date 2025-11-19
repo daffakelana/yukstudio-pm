@@ -48,7 +48,6 @@ RUN npm run build
 # Set permissions
 RUN chmod -R 775 storage bootstrap/cache
 
-EXPOSE 8000
+EXPOSE 8080
 
-# Gunakan artisan serve atau php-fpm sesuai kebutuhan
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]

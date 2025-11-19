@@ -1,57 +1,56 @@
-# Base PHP image
-FROM php:8.3-fpm
+# ============================
+# Stage 1: Build Vite Assets
+# ============================
+FROM node:18 AS frontend
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+
+# ============================
+# Stage 2: PHP-FPM + Composer
+# ============================
+FROM php:8.3-fpm AS backend
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    unzip \
-    nodejs \
-    npm \
-    libpng-dev \
-    libzip-dev \
-    libonig-dev \
-    libxml2-dev \
-    libicu-dev \
-    zip
-
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+    git curl unzip nginx supervisor \
+    libpng-dev libzip-dev libonig-dev libxml2-dev libicu-dev zip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
 
-# Install Composer
+# Copy composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
+# Set workdir
 WORKDIR /var/www
 
-# Copy project files into container
+# Copy app code
 COPY . .
 
-# ENV sebelum composer
-ENV APP_ENV=production
-ENV APP_KEY=base64:X+wV86VcUvKwcKyBTHA3O7OFXlVmu+9e43DLiz2NRms=
+# Copy built frontend assets
+COPY --from=frontend /app/public/build ./public/build
 
-# Install PHP dependencies (ini HARUS selesai dulu!)
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Clear Laravel caches
-RUN php artisan optimize:clear
+# Storage & cache permission
+RUN chmod -R 777 storage bootstrap/cache
 
-# Publish Filament assets (fonts, etc)
-RUN php artisan vendor:publish --tag=filament-public --force
+# ============================
+# Nginx Setup
+# ============================
+COPY ./nginx.conf /etc/nginx/nginx.conf
 
-# Generate Filament assets
-RUN php artisan filament:assets
-
-# Build Vite assets
-RUN npm install
-RUN npm run build
-
-# Permissions
-RUN chmod -R 775 storage bootstrap/cache
+# Supervisor (run PHP-FPM + Nginx together)
+COPY ./supervisor.conf /etc/supervisor/conf.d/supervisor.conf
 
 EXPOSE 8080
 
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]
+CMD ["/usr/bin/supervisord"]

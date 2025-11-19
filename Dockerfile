@@ -33,8 +33,8 @@ COPY . .
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Build Filament assets (important for production)
-RUN php artisan filament:assets --force
+# Build Filament assets (v3 — NO --force)
+RUN php artisan filament:assets
 
 # Build Vite assets
 RUN npm install

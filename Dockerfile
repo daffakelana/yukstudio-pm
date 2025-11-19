@@ -1,5 +1,5 @@
-# PHP base image
-FROM php:8.2-fpm
+# PHP base image (8.3)
+FROM php:8.3-fpm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -16,35 +16,34 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Create working directory
 WORKDIR /var/www
 
-# Copy only composer files first for cache optimization
+# Copy composer files
 COPY composer.json composer.lock ./
 
-# Install composer
+# Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Install PHP dependencies BEFORE npm run build
+# Install PHP dependencies BEFORE npm build
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --optimize-autoloader
 
-# Copy package.json first (better cache)
+# Copy package.json files
 COPY package.json package-lock.json ./
 
-# Install Node/Vite dependencies
+# Install Vite / Node dependencies
 RUN npm install
 
-# Copy the whole application
+# Copy entire project AFTER composer works
 COPY . .
 
-# Build frontend AFTER vendor exists
+# Build Vite
 RUN npm run build
 
 # Laravel optimize
 RUN php artisan optimize:clear && php artisan optimize
 
-# Expose port used by Railway
+# Railway uses reverse proxy, FPM run at 8000 for safety
 EXPOSE 8000
 
-# Start PHP-FPM
 CMD ["php-fpm"]

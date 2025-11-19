@@ -15,7 +15,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 # Workdir
 WORKDIR /var/www
 
-# Copy all project files FIRST — including artisan
+# Copy all project files
 COPY . .
 
 # Install Composer
@@ -27,15 +27,24 @@ RUN composer install \
     --prefer-dist \
     --optimize-autoloader
 
-# Install Node dependencies AFTER project files copied
+# Publish Filament assets & views (PENTING!)
+RUN php artisan filament:assets
+RUN php artisan vendor:publish --tag=filament-config 
+RUN php artisan vendor:publish --tag=filament-views 
+
+# Install Node dependencies
 RUN npm install
 
 # Build frontend
 RUN npm run build
 
-# Laravel optimize
+# Laravel optimize (hapus optimize view yang bermasalah)
 RUN php artisan optimize:clear
-RUN php artisan optimize
+RUN php artisan config:cache
+RUN php artisan route:cache
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 EXPOSE 8000
 

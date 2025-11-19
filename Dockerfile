@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     zip
 
-# Clear apt cache (biar image kecil)
+# Clear apt cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
@@ -30,21 +30,21 @@ WORKDIR /var/www
 # Copy the entire project
 COPY . .
 
-# Install PHP dependencies (production mode)
+# Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
-# Generate Filament assets to public/vendor/filament
+# Build Filament assets (important for production)
 RUN php artisan filament:assets --force
 
 # Build Vite assets
 RUN npm install
 RUN npm run build
 
-# Ensure Laravel storage folder is writable
+# Fix permissions
 RUN chmod -R 775 storage bootstrap/cache
 
 # Expose port (Railway uses 8080)
 EXPOSE 8080
 
-# Start Laravel using PHP's built-in production server
+# Start Laravel production server
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]

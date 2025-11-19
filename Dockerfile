@@ -1,33 +1,32 @@
 FROM php:8.3-fpm
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
     libicu-dev \
     libzip-dev \
-    zip \
-    unzip \
-    git \
-    curl
+    zip unzip git curl nodejs npm
 
-# Clear cache
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
 
-# Get latest Composer
+# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www
 
-# Copy existing application directory permissions
-COPY --chown=www-data:www-data . /var/www
+COPY . .
 
-# Expose port 9000 for PHP-FPM
-EXPOSE 9000
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+RUN npm install
+RUN npm run build
 
-CMD ["php-fpm"]
+# Expose port (HARUS 8080)
+EXPOSE 8080
+
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8080"]

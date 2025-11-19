@@ -45,8 +45,10 @@ RUN npm install
 # Build frontend
 RUN npm run build
 
-# Set permissions
-RUN chmod -R 775 storage bootstrap/cache
+# Create required directories dan set permissions
+RUN mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs
+RUN chmod -R 777 storage bootstrap/cache
+RUN chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 8080
 

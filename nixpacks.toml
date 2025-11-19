@@ -1,8 +1,19 @@
 [phases.setup]
-nixPkgs = ['nginx', 'php82', 'php82Packages.composer']
+nixPkgs = ['nginx', 'php82', 'php82Extensions.pdo', 'php82Extensions.pdo_mysql', 'php82Extensions.mbstring', 'php82Extensions.openssl', 'nodejs_20']
+
+[phases.install]
+cmds = [
+    'composer install --no-dev --optimize-autoloader --no-interaction',
+    'npm ci'
+]
 
 [phases.build]
-cmds = ['composer install --no-dev --optimize-autoloader']
+cmds = [
+    'npm run build',
+    'php artisan config:cache',
+    'php artisan route:cache',
+    'php artisan view:cache'
+]
 
 [start]
-cmd = 'cp /assets/nginx.conf /etc/nginx/nginx.conf && php-fpm -D && nginx -g "daemon off;"'
+cmd = 'bash start.sh'

@@ -1,56 +1,50 @@
-# ============================
-# Stage 1: Build Vite Assets
-# ============================
-FROM node:18 AS frontend
-
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-RUN npm run build
-
-
-# ============================
-# Stage 2: PHP-FPM + Composer
-# ============================
-FROM php:8.3-fpm AS backend
+# PHP base image
+FROM php:8.2-fpm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    git curl unzip nginx supervisor \
-    libpng-dev libzip-dev libonig-dev libxml2-dev libicu-dev zip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    git curl zip unzip \
+    libpng-dev libjpeg-dev libfreetype6-dev \
+    libonig-dev libzip-dev libicu-dev libxml2-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd intl zip
+# Install Node.js 20
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
 
-# Copy composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set workdir
+# Create working directory
 WORKDIR /var/www
 
-# Copy app code
+# Copy only composer files first for cache optimization
+COPY composer.json composer.lock ./
+
+# Install composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Install PHP dependencies BEFORE npm run build
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --optimize-autoloader
+
+# Copy package.json first (better cache)
+COPY package.json package-lock.json ./
+
+# Install Node/Vite dependencies
+RUN npm install
+
+# Copy the whole application
 COPY . .
 
-# Copy built frontend assets
-COPY --from=frontend /app/public/build ./public/build
+# Build frontend AFTER vendor exists
+RUN npm run build
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Laravel optimize
+RUN php artisan optimize:clear && php artisan optimize
 
-# Storage & cache permission
-RUN chmod -R 777 storage bootstrap/cache
+# Expose port used by Railway
+EXPOSE 8000
 
-# ============================
-# Nginx Setup
-# ============================
-COPY ./nginx.conf /etc/nginx/nginx.conf
-
-# Supervisor (run PHP-FPM + Nginx together)
-COPY ./supervisor.conf /etc/supervisor/conf.d/supervisor.conf
-
-EXPOSE 8080
-
-CMD ["/usr/bin/supervisord"]
+# Start PHP-FPM
+CMD ["php-fpm"]
